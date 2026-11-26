@@ -121,6 +121,7 @@ export default function App() {
     zoom?: number;
     seq: number;
   } | null>(null);
+  const [fitBoundsSeq, setFitBoundsSeq] = useState(0);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [sheetsOpen, setSheetsOpen] = useState(false);
@@ -616,7 +617,10 @@ export default function App() {
   const handleDmaChange = useCallback(
     (nextDma: string) => {
       setSelectedDma(nextDma);
-      if (nextDma === 'all') return;
+      setFitBoundsSeq((s) => s + 1);
+      if (nextDma === 'all') {
+        return;
+      }
       const norm = nextDma.trim().toUpperCase();
       const matches = roleScopedLeaks.filter(
         (l) => (l.dma || '').trim().toUpperCase() === norm
@@ -624,15 +628,14 @@ export default function App() {
       setSelectedId((prev) =>
         prev && matches.some((m) => m.id === prev) ? prev : null
       );
-      const firstPinned = matches.find(
-        (m) => m.lat !== null && m.lng !== null
-      );
-      if (firstPinned && firstPinned.lat !== null && firstPinned.lng !== null) {
-        panToLocation(firstPinned.lat, firstPinned.lng, 14);
-      }
     },
-    [roleScopedLeaks, panToLocation]
+    [roleScopedLeaks]
   );
+
+  const handleSeverityChange = useCallback((nextSeverity: LeakSeverity | 'all') => {
+    setSeverityFilter(nextSeverity);
+    setFitBoundsSeq((s) => s + 1);
+  }, []);
 
   const scrollToMap = useCallback(() => {
     mapSectionRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'});
@@ -1253,7 +1256,7 @@ export default function App() {
                   filteredLeaks={filteredLeaks}
                   onSearchChange={setSearchQuery}
                   onDmaChange={handleDmaChange}
-                  onSeverityChange={setSeverityFilter}
+                  onSeverityChange={handleSeverityChange}
                 />
               </div>
 
@@ -1295,10 +1298,12 @@ export default function App() {
                     isPickingLocation={isPickingLocation}
                     pickingReason={pickingReason}
                     focusTarget={focusTarget}
+                    fitBoundsSeq={fitBoundsSeq}
                     draftPin={
                       drawerOpen && pickedCoords ? pickedCoords : null
                     }
                     theme={theme}
+                    hasApiKey={Boolean(MAPS_API_KEY)}
                     onSelectLeak={setSelectedId}
                     onPickMapLocation={handlePickMapLocation}
                     onStartPickNew={handleStartPickNew}
