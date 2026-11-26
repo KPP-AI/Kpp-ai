@@ -1,0 +1,6 @@
+{
+  "name": "HydroPin - ระบบบันทึกจุดรั่วท่อประปา",
+  "description": "เว็บแอปพลิเคชันระบบ GIS สำหรับปักหมุดจุดท่อประปารั่วบนแผนที่ บันทึกรายละเอียดงานซ่อมบำรุงแยกตามเขต DMA และแนบภาพถ่ายหน้างาน",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
