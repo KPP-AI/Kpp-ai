@@ -906,7 +906,7 @@ export default function App() {
           onOpenAdminLogin={() => setLoginModalOpen(true)}
         />
       ) : (
-        <div className="min-h-screen flex flex-col bg-[#F0F5FA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-x-hidden">
+          <div className="min-h-dvh flex flex-col bg-[#F0F5FA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-x-hidden">
           {/* Quota Defense Banner */}
           {quotaExceeded && (
             <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
@@ -927,14 +927,14 @@ export default function App() {
           )}
 
           {/* Top Bar */}
-          <header className="h-14 md:h-16 bg-gradient-to-r from-[#0A4DA2] via-[#1267C9] to-[#1A7FE2] dark:from-[#0B1D3A] dark:via-[#0F2A54] dark:to-[#13386E] text-white px-3 sm:px-6 flex items-center justify-between gap-2 md:gap-4 sticky top-0 z-30 shrink-0 shadow-sm">
+          <header className="h-14 md:h-16 bg-gradient-to-r from-[#0A4DA2] via-[#1267C9] to-[#1A7FE2] dark:from-[#0B1D3A] dark:via-[#0F2A54] dark:to-[#13386E] text-white px-2.5 sm:px-6 flex items-center justify-between gap-1.5 sm:gap-2 md:gap-4 sticky top-0 z-30 shrink-0 shadow-sm">
             <a
               href="#top"
               onClick={(e) => {
                 e.preventDefault();
                 setActiveView('map');
               }}
-              className="inline-flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-white whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-base font-bold tracking-tight text-white min-w-0"
             >
               <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-xs shrink-0">
                 <img
@@ -943,7 +943,7 @@ export default function App() {
                   className="w-full h-full object-contain"
                 />
               </span>
-              <span>รายการจุดแตกรั่ว</span>
+              <span className="truncate">รายการจุดแตกรั่ว</span>
             </a>
 
             {/* Desktop Navigation */}
@@ -978,7 +978,7 @@ export default function App() {
             </nav>
 
             {/* Right Header Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <HeaderQuickControls
                 theme={theme}
                 onChangeTheme={setTheme}
@@ -988,9 +988,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleOpenNew}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 md:px-4 md:py-2 rounded-full bg-white text-[#0A4DA2] text-xs font-semibold hover:bg-sky-50 shadow-xs transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 md:px-4 md:py-2 rounded-full bg-white text-[#0A4DA2] text-[11px] md:text-xs font-semibold hover:bg-sky-50 shadow-xs transition-colors whitespace-nowrap shrink-0"
               >
-                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
                 <span className="md:hidden">แจ้งจุดรั่ว</span>
                 <span className="hidden md:inline">ลงจุดรั่วท่อประปาใหม่</span>
               </button>
@@ -1113,14 +1113,14 @@ export default function App() {
         {/* Main Workspace */}
         <main className="flex-1 flex flex-col">
           {activeView === 'map' || !isAdmin ? (
-            <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-3 sm:space-y-5">
+            <div className="max-w-7xl w-full mx-auto px-2.5 sm:px-6 py-2.5 sm:py-5 space-y-2.5 sm:space-y-5">
               {/* Hero Blue Banner */}
               <section
                 aria-label="หัวข้อระบบบริหารจัดการจุดแตกรั่ว"
-                className="rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#0A4999] via-[#1267CC] to-[#1C8EE9] dark:from-[#0C2142] dark:via-[#123364] dark:to-[#164482] text-white px-4 py-3.5 sm:px-7 sm:py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4"
+                className="rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#0A4999] via-[#1267CC] to-[#1C8EE9] dark:from-[#0C2142] dark:via-[#123364] dark:to-[#164482] text-white px-3.5 py-2.5 sm:px-7 sm:py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-2.5 md:gap-4"
               >
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0">
                     <img
                       src={APP_LOGO_SRC}
                       alt="โลโก้ระบบจุดแตกรั่วท่อประปา"
@@ -1128,7 +1128,7 @@ export default function App() {
                     />
                   </div>
                   <div className="min-w-0">
-                    <h1 className="text-base sm:text-xl font-bold tracking-tight text-white">
+                    <h1 className="text-sm sm:text-xl font-bold tracking-tight text-white leading-snug">
                       ระบบติดตามและจัดการจุดแตกรั่วท่อประปา
                     </h1>
                     {/* Hidden on mobile per requirement 10 */}
@@ -1261,18 +1261,18 @@ export default function App() {
               <section
                 ref={mapSectionRef}
                 aria-label="แผนที่จุดแตกรั่วท่อประปา"
-                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-t-[3px] border-t-[#16A34A] rounded-xl sm:rounded-2xl shadow-xs p-3 sm:p-5 md:p-6 space-y-2.5 sm:space-y-4"
+                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-t-[3px] border-t-[#16A34A] rounded-xl sm:rounded-2xl shadow-xs p-2.5 sm:p-5 md:p-6 space-y-2 sm:space-y-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-                  <div className="flex items-center gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#16A34A] text-white flex items-center justify-center shrink-0">
                       <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
-                    <div>
-                      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    <div className="min-w-0">
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                         แผนที่จุดแตกรั่วท่อประปา
                       </h2>
-                      <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
                         แสดงพิกัดจุดแตกรั่วตามสีระดับความเร่งด่วน และคลิกปักหมุดบนแผนที่
                       </p>
                     </div>
@@ -1288,7 +1288,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="w-full h-[500px] sm:h-[500px] lg:h-[540px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+                <div className="w-full h-[430px] sm:h-[500px] lg:h-[540px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
                   <LeakMapWorkspace
                     leaks={filteredLeaks}
                     selectedId={selectedId}

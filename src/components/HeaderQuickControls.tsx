@@ -52,13 +52,18 @@ export const HeaderQuickControls: React.FC<HeaderQuickControlsProps> = ({
 
   return (
     <>
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {!isInstalled && (
           <button
             type="button"
             onClick={() => void handleInstallClick()}
             title="ติดตั้งแอปหรือสร้างทางลัดบนหน้าจอหลัก"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full bg-white/15 hover:bg-white/25 border border-white/30 text-white text-[11px] sm:text-xs font-medium backdrop-blur-xs transition-colors whitespace-nowrap shrink-0"
+            aria-label="ติดตั้งแอปหรือสร้างทางลัดบนหน้าจอหลัก"
+            className={`inline-flex items-center gap-1.5 rounded-full bg-white/15 hover:bg-white/25 border border-white/30 text-white text-[11px] sm:text-xs font-medium backdrop-blur-xs transition-colors whitespace-nowrap shrink-0 ${
+              compactOnMobile
+                ? 'p-1.5 sm:px-3.5 sm:py-1.5'
+                : 'px-2.5 py-1.5 sm:px-3.5 sm:py-1.5'
+            }`}
           >
             <Download className="w-3.5 h-3.5 shrink-0" />
             <span className={compactOnMobile ? 'hidden sm:inline' : ''}>
@@ -77,7 +82,12 @@ export const HeaderQuickControls: React.FC<HeaderQuickControlsProps> = ({
             type="button"
             onClick={() => onChangeTheme('day')}
             aria-pressed={theme === 'day'}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full text-[11px] sm:text-xs font-semibold transition-all whitespace-nowrap ${
+            aria-label="โหมดกลางวัน"
+            className={`inline-flex items-center gap-1 rounded-full text-[11px] sm:text-xs font-semibold transition-all whitespace-nowrap ${
+              compactOnMobile
+                ? 'p-1.5 sm:px-3 sm:py-1'
+                : 'px-2.5 py-1 sm:px-3 sm:py-1'
+            } ${
               theme === 'day'
                 ? 'bg-white text-[#0A4DA2] shadow-xs'
                 : 'text-white/90 hover:text-white'
@@ -93,7 +103,12 @@ export const HeaderQuickControls: React.FC<HeaderQuickControlsProps> = ({
             type="button"
             onClick={() => onChangeTheme('night')}
             aria-pressed={theme === 'night'}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full text-[11px] sm:text-xs font-semibold transition-all whitespace-nowrap ${
+            aria-label="โหมดกลางคืน"
+            className={`inline-flex items-center gap-1 rounded-full text-[11px] sm:text-xs font-semibold transition-all whitespace-nowrap ${
+              compactOnMobile
+                ? 'p-1.5 sm:px-3 sm:py-1'
+                : 'px-2.5 py-1 sm:px-3 sm:py-1'
+            } ${
               theme === 'night'
                 ? 'bg-slate-900 text-sky-300 shadow-xs'
                 : 'text-white/90 hover:text-white'
@@ -110,24 +125,24 @@ export const HeaderQuickControls: React.FC<HeaderQuickControlsProps> = ({
       {/* Install / Shortcut Guide Modal */}
       {guideOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label="ติดตั้งแอปและเพิ่มทางลัด"
         >
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100">
-            <div className="px-5 py-4 bg-gradient-to-r from-[#0A4DA2] to-[#1A7FE2] text-white flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
+          <div className="w-full max-w-md max-h-[90dvh] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100">
+            <div className="px-4 sm:px-5 py-3.5 sm:py-4 bg-gradient-to-r from-[#0A4DA2] to-[#1A7FE2] text-white flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <img
                   src="/assets/aistudio/_________________________2e00b14d.png"
                   alt="ไอคอนรายการจุดแตกรั่ว"
                   className="w-9 h-9 rounded-xl bg-white p-0.5 object-contain shrink-0"
                 />
-                <div>
-                  <h3 className="text-sm font-bold">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold truncate">
                     ติดตั้งแอป / เพิ่มทางลัดหน้าจอหลัก
                   </h3>
-                  <p className="text-[11px] text-sky-100">
+                  <p className="text-[11px] text-sky-100 truncate">
                     เปิดใช้งานได้รวดเร็วเหมือนแอปบนมือถือและคอมพิวเตอร์
                   </p>
                 </div>
@@ -136,13 +151,13 @@ export const HeaderQuickControls: React.FC<HeaderQuickControlsProps> = ({
                 type="button"
                 onClick={() => setGuideOpen(false)}
                 aria-label="ปิดหน้าต่าง"
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors"
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-xs">
+            <div className="p-4 sm:p-5 space-y-3.5 sm:space-y-4 text-xs overflow-y-auto">
               {isInstallable && (
                 <button
                   type="button"

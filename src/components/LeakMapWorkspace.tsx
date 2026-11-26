@@ -205,16 +205,67 @@ const LeakMarkerItem: React.FC<LeakMarkerItemProps> = ({
 };
 
 interface MapViewportControllerProps {
+  pinnedLeaks: LeakPoint[];
+  isMobile: boolean;
   focusTarget: {lat: number; lng: number; zoom?: number; seq: number} | null;
 }
 
 const MapViewportController: React.FC<MapViewportControllerProps> = ({
+  pinnedLeaks,
+  isMobile,
   focusTarget,
 }) => {
   const map = useMap();
+  const hasInitialFitRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!map || hasInitialFitRef.current || focusTarget) return;
+    if (pinnedLeaks.length === 0) return;
+
+    const validPins = pinnedLeaks.filter(
+      (l): l is LeakPoint & {lat: number; lng: number} =>
+        typeof l.lat === 'number' &&
+        Number.isFinite(l.lat) &&
+        typeof l.lng === 'number' &&
+        Number.isFinite(l.lng)
+    );
+    if (validPins.length === 0) return;
+
+    if (validPins.length === 1) {
+      hasInitialFitRef.current = true;
+      map.setCenter({lat: validPins[0].lat, lng: validPins[0].lng});
+      map.setZoom(16);
+      return;
+    }
+
+    const LatLngBounds = window.google?.maps?.LatLngBounds;
+    if (!LatLngBounds) return;
+
+    hasInitialFitRef.current = true;
+    const bounds = new LatLngBounds();
+    for (const pin of validPins) {
+      bounds.extend({lat: pin.lat, lng: pin.lng});
+    }
+
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    if (ne.equals(sw)) {
+      map.setCenter({lat: validPins[0].lat, lng: validPins[0].lng});
+      map.setZoom(16);
+      return;
+    }
+
+    map.fitBounds(bounds, {
+      top: isMobile ? 48 : 80,
+      right: isMobile ? 32 : 48,
+      bottom: isMobile ? 36 : 48,
+      left: isMobile ? 32 : 48,
+    });
+  }, [map, pinnedLeaks, isMobile, focusTarget]);
 
   useEffect(() => {
     if (!map || !focusTarget) return;
+    hasInitialFitRef.current = true;
     map.panTo({lat: focusTarget.lat, lng: focusTarget.lng});
     if (focusTarget.zoom) {
       map.setZoom(focusTarget.zoom);
@@ -403,7 +454,7 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
       </div>
 
       {/* Map Canvas Container */}
-      <div className="relative flex-1 min-h-[340px] w-full bg-slate-100 dark:bg-slate-950">
+      <div className="relative flex-1 min-h-[300px] sm:min-h-[340px] w-full bg-slate-100 dark:bg-slate-950">
         {/* Desktop Floating Top Map Controls */}
         <div className="hidden sm:flex absolute top-3 left-3 right-3 z-20 items-start justify-between gap-2 pointer-events-none">
           <div className="pointer-events-auto min-w-[280px]">
@@ -484,7 +535,7 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
           selectedLeak &&
           selectedColors &&
           !isPickingLocation && (
-            <div className="sm:hidden absolute bottom-2.5 left-2.5 right-2.5 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl p-3">
+            <div className="sm:hidden absolute bottom-2 left-2 right-2 z-20 max-h-[calc(100%-16px)] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl p-3">
               {/* Header Row */}
               <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -656,7 +707,11 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
             internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
             style={{width: '100%', height: '100%'}}
           >
-            <MapViewportController focusTarget={focusTarget} />
+            <MapViewportController
+              pinnedLeaks={pinnedLeaks}
+              isMobile={isMobile}
+              focusTarget={focusTarget}
+            />
 
             {pinnedLeaks.map((leak) => (
               <LeakMarkerItem
