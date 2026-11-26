@@ -20,6 +20,7 @@ import {
   LocateFixed,
   MapPin,
   Maximize2,
+  RefreshCw,
   Scan,
   X,
 } from 'lucide-react';
@@ -340,6 +341,7 @@ interface LeakMapWorkspaceProps {
   draftPin: {lat: number; lng: number} | null;
   theme?: 'day' | 'night';
   hasApiKey?: boolean;
+  mapsError?: string | null;
   onSelectLeak: (id: string | null) => void;
   onPickMapLocation: (lat: number, lng: number) => void;
   onStartPickNew: () => void;
@@ -362,6 +364,7 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
   draftPin,
   theme = 'day',
   hasApiKey = true,
+  mapsError = null,
   onSelectLeak,
   onPickMapLocation,
   onStartPickNew,
@@ -757,14 +760,29 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
           apiStatus === APILoadingStatus.FAILED ||
           apiStatus === APILoadingStatus.AUTH_FAILURE) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
-            <div className="max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center space-y-2 shadow-sm">
+            <div className="max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center space-y-3 shadow-sm">
               <MapPin className="w-8 h-8 text-amber-600 mx-auto" />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                 ไม่สามารถโหลดแผนที่ Google Maps ได้
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                กรุณาตรวจสอบการตั้งค่า Google Maps API Key หรือโควต้าการใช้งานในโปรเจกต์
+                {!hasApiKey
+                  ? 'ไม่พบ Google Maps API Key ในการตั้งค่าโปรเจกต์ กรุณาตั้งค่า Google Maps API Key แล้วลองใหม่อีกครั้ง'
+                  : 'กรุณาตรวจสอบการตั้งค่า Google Maps API Key การเชื่อมต่ออินเทอร์เน็ต หรือโควต้าการใช้งานในโปรเจกต์'}
               </p>
+              {mapsError && (
+                <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 break-words">
+                  {mapsError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>ลองโหลดแผนที่ใหม่</span>
+              </button>
             </div>
           </div>
         )}

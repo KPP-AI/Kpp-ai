@@ -149,6 +149,16 @@ async function startServer() {
     res.json({ok: true});
   });
 
+  app.get('/api/maps-config', (_req: Request, res: Response) => {
+    const apiKey = (
+      process.env.VITE_GOOGLE_MAPS_API_KEY ||
+      process.env.GOOGLE_MAPS_API_KEY ||
+      ''
+    ).trim();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({apiKey});
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const {createServer: createViteServer} = await import('vite');
     const vite = await createViteServer({

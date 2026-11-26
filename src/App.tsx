@@ -68,7 +68,10 @@ import {AdminLoginModal} from './components/AdminLoginModal';
 import {AppTheme, HeaderQuickControls} from './components/HeaderQuickControls';
 import {LandingPage} from './components/LandingPage';
 
-const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const INITIAL_MAPS_API_KEY = (
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+).trim();
+const MAP_LIBRARIES: ('marker')[] = ['marker'];
 const SHEET_PREF_KEY = 'hydropin_sheet_pref_v1';
 const THEME_PREF_KEY = 'hydropin_theme_v1';
 const APP_LOGO_SRC = '/assets/aistudio/_________________________2e00b14d.png';
@@ -78,6 +81,11 @@ type ActiveView = 'map' | 'table';
 export default function App() {
   const [leaks, setLeaks] = useState<LeakPoint[]>([]);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [mapsApiKey, setMapsApiKey] = useState<string>(INITIAL_MAPS_API_KEY);
+  const [mapsConfigReady, setMapsConfigReady] = useState<boolean>(
+    Boolean(INITIAL_MAPS_API_KEY)
+  );
+  const [mapsLoadError, setMapsLoadError] = useState<string | null>(null);
 
   // Pre-entry landing page & Day/Night theme
   const [showLanding, setShowLanding] = useState(true);
@@ -219,6 +227,29 @@ export default function App() {
       if (sheetsOpen) setSheetsOpen(false);
     }
   }, [isAdmin, activeView, severityFilter, reportOpen, sheetsOpen]);
+
+  // Runtime fallback for Maps API key when build-time Vite env is absent
+  useEffect(() => {
+    if (INITIAL_MAPS_API_KEY) return;
+    let active = true;
+    fetch('/api/maps-config', {cache: 'no-store'})
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: {apiKey?: unknown} | null) => {
+        if (!active) return;
+        if (data && typeof data.apiKey === 'string' && data.apiKey.trim()) {
+          setMapsApiKey(data.apiKey.trim());
+        }
+      })
+      .catch(() => {
+        // Fallback card handles missing key cleanly
+      })
+      .finally(() => {
+        if (active) setMapsConfigReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Quota exceeded listener
   useEffect(() => {
@@ -886,12 +917,25 @@ export default function App() {
     [roleScopedLeaks]
   );
 
+  if (!mapsConfigReady) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-[#F0F5FA] dark:bg-slate-950 text-xs text-slate-500 dark:text-slate-400">
+        กำลังเตรียมระบบแผนที่...
+      </div>
+    );
+  }
+
   return (
     <APIProvider
-      apiKey={MAPS_API_KEY}
+      apiKey={mapsApiKey}
       language="th"
       region="TH"
-      libraries={['marker', 'places']}
+      libraries={MAP_LIBRARIES}
+      onError={(err) =>
+        setMapsLoadError(
+          err instanceof Error ? err.message : String(err || 'load_failed')
+        )
+      }
     >
       {showLanding ? (
         <LandingPage
@@ -1303,7 +1347,8 @@ export default function App() {
                       drawerOpen && pickedCoords ? pickedCoords : null
                     }
                     theme={theme}
-                    hasApiKey={Boolean(MAPS_API_KEY)}
+                    hasApiKey={Boolean(mapsApiKey)}
+                    mapsError={mapsLoadError}
                     onSelectLeak={setSelectedId}
                     onPickMapLocation={handlePickMapLocation}
                     onStartPickNew={handleStartPickNew}
