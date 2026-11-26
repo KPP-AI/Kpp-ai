@@ -14,12 +14,14 @@ import {
 import {
   AlertTriangle,
   Camera,
+  Compass,
   Crosshair,
   Edit3,
   Layers,
   LocateFixed,
   MapPin,
   Maximize2,
+  Minimize2,
   RefreshCw,
   Scan,
   X,
@@ -331,6 +333,80 @@ const MapViewportController: React.FC<MapViewportControllerProps> = ({
   return null;
 };
 
+interface StreetViewControllerProps {
+  toggleSeq: number;
+  targetLeak: LeakPoint | null;
+  onStreetViewChange: (visible: boolean) => void;
+  onStatusMessage: (msg: string) => void;
+}
+
+const StreetViewController: React.FC<StreetViewControllerProps> = ({
+  toggleSeq,
+  targetLeak,
+  onStreetViewChange,
+  onStatusMessage,
+}) => {
+  const map = useMap();
+  const lastSeqRef = React.useRef(toggleSeq);
+
+  useEffect(() => {
+    if (!map) return;
+    const sv = map.getStreetView();
+    if (!sv) return;
+    const listener = sv.addListener('visible_changed', () => {
+      onStreetViewChange(Boolean(sv.getVisible()));
+    });
+    return () => {
+      listener.remove();
+    };
+  }, [map, onStreetViewChange]);
+
+  useEffect(() => {
+    if (!map || toggleSeq === lastSeqRef.current) return;
+    lastSeqRef.current = toggleSeq;
+
+    const sv = map.getStreetView();
+    if (!sv) return;
+
+    if (sv.getVisible()) {
+      sv.setVisible(false);
+      onStreetViewChange(false);
+      return;
+    }
+
+    const StreetViewService = window.google?.maps?.StreetViewService;
+    if (!StreetViewService) {
+      onStatusMessage('ระบบ Street View ยังไม่พร้อมใช้งาน');
+      return;
+    }
+
+    const center =
+      targetLeak &&
+      typeof targetLeak.lat === 'number' &&
+      typeof targetLeak.lng === 'number'
+        ? {lat: targetLeak.lat, lng: targetLeak.lng}
+        : map.getCenter();
+
+    if (!center) return;
+
+    const service = new StreetViewService();
+    service.getPanorama({location: center, radius: 200}, (data, status) => {
+      if (status === 'OK' && data?.location?.latLng) {
+        sv.setPosition(data.location.latLng);
+        sv.setPov({heading: 0, pitch: 0});
+        sv.setVisible(true);
+        onStreetViewChange(true);
+      } else {
+        onStatusMessage(
+          'ไม่พบภาพ Street View ในระยะ 200 เมตรจากจุดนี้ กรุณาเลื่อนไปยังถนนหลัก'
+        );
+      }
+    });
+  }, [map, toggleSeq, targetLeak, onStreetViewChange, onStatusMessage]);
+
+  return null;
+};
+
 interface LeakMapWorkspaceProps {
   leaks: LeakPoint[];
   selectedId: string | null;
@@ -351,6 +427,15 @@ interface LeakMapWorkspaceProps {
   onOpenLightbox: (photos: LeakPhoto[], index: number, title: string) => void;
   onPanToLocation: (lat: number, lng: number, zoom?: number) => void;
 }
+
+type MapTypeOption = 'roadmap' | 'satellite' | 'hybrid' | 'terrain';
+
+const MAP_TYPE_OPTIONS: {id: MapTypeOption; label: string}[] = [
+  {id: 'roadmap', label: 'แผนที่'},
+  {id: 'satellite', label: 'ดาวเทียม'},
+  {id: 'hybrid', label: 'ไฮบริด'},
+  {id: 'terrain', label: 'ภูมิประเทศ'},
+];
 
 const DEFAULT_CENTER = {lat: 13.8195, lng: 100.519};
 
@@ -376,8 +461,11 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
 }) => {
   const isApiLoaded = useApiIsLoaded();
   const apiStatus = useApiLoadingStatus();
-  const [mapTypeId, setMapTypeId] = useState<'roadmap' | 'hybrid'>('roadmap');
+  const [mapTypeId, setMapTypeId] = useState<MapTypeOption>('hybrid');
   const [localFitSeq, setLocalFitSeq] = useState(0);
+  const [streetViewSeq, setStreetViewSeq] = useState(0);
+  const [streetViewActive, setStreetViewActive] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [searchPin, setSearchPin] = useState<{
     lat: number;
     lng: number;
@@ -397,6 +485,22 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  useEffect(() => {
+    if (!isExpanded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsExpanded(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isExpanded]);
+
+  const showTempStatus = useCallback((msg: string) => {
+    setGpsStatus(msg);
+    setTimeout(() => {
+      setGpsStatus((prev) => (prev === msg ? null : prev));
+    }, 3500);
+  }, []);
+
   const handleMapClick = useCallback(
     (e: MapMouseEvent) => {
       const latLng = e.detail.latLng;
@@ -412,7 +516,7 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
 
   const handleLocateMe = useCallback(() => {
     if (!navigator.geolocation) {
-      setGpsStatus('เบราว์เซอร์ไม่รองรับการระบุตำแหน่ง GPS');
+      showTempStatus('เบราว์เซอร์ไม่รองรับการระบุตำแหน่ง GPS');
       return;
     }
     setGpsStatus('กำลังค้นหาตำแหน่ง...');
@@ -428,12 +532,11 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
         });
       },
       () => {
-        setGpsStatus('ไม่สามารถเข้าถึงตำแหน่ง GPS ได้');
-        setTimeout(() => setGpsStatus(null), 3500);
+        showTempStatus('ไม่สามารถเข้าถึงตำแหน่ง GPS ได้');
       },
       {enableHighAccuracy: true, timeout: 8000}
     );
-  }, [onPanToLocation]);
+  }, [onPanToLocation, showTempStatus]);
 
   const pinnedLeaks = leaks.filter(
     (l) => l.lat !== null && l.lng !== null
@@ -459,81 +562,18 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
     : '';
 
   return (
-    <div className="flex flex-col w-full h-full bg-slate-100 dark:bg-slate-900">
-      {/* Mobile Dedicated Map Toolbar (stacked cleanly above map, zero overlap) */}
-      <div className="sm:hidden bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-2.5 space-y-2 shrink-0 z-20">
-        <PlaceSearchBox
-          onSelectLocation={(loc) => {
-            setSearchPin(loc);
-            onPanToLocation(loc.lat, loc.lng, 17);
-          }}
-        />
-
-        <div className="grid grid-cols-4 gap-1.5">
-          <button
-            type="button"
-            onClick={() =>
-              setMapTypeId((prev) =>
-                prev === 'roadmap' ? 'hybrid' : 'roadmap'
-              )
-            }
-            className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap"
-          >
-            <Layers className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-            <span className="truncate">
-              {mapTypeId === 'roadmap' ? 'ดาวเทียม' : 'ถนน'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLocateMe}
-            className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap"
-          >
-            <LocateFixed className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
-            <span className="truncate">พิกัดฉัน</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              onSelectLeak(null);
-              setLocalFitSeq((n) => n + 1);
-            }}
-            disabled={pinnedLeaks.length === 0}
-            className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 shadow-xs transition-colors whitespace-nowrap"
-          >
-            <Scan className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="truncate">ทั้งหมด</span>
-          </button>
-
-          {!isPickingLocation ? (
-            <button
-              type="button"
-              onClick={onStartPickNew}
-              className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-sky-600 text-white text-[11px] font-medium hover:bg-sky-700 shadow-xs transition-colors whitespace-nowrap"
-            >
-              <Crosshair className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">ปักหมุด</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onCancelPick}
-              className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-slate-900 text-white text-[11px] font-medium hover:bg-slate-800 shadow-xs transition-colors whitespace-nowrap"
-            >
-              <X className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">ยกเลิก</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Map Canvas Container */}
-      <div className="relative flex-1 min-h-[300px] sm:min-h-[340px] w-full bg-slate-100 dark:bg-slate-950">
-        {/* Desktop Floating Top Map Controls */}
-        <div className="hidden sm:flex absolute top-3 left-3 right-3 z-20 items-start justify-between gap-2 pointer-events-none">
-          <div className="pointer-events-auto min-w-[280px]">
+    <div
+      className={
+        isExpanded
+          ? 'fixed inset-0 z-40 flex flex-col w-screen h-dvh bg-white dark:bg-slate-900'
+          : 'flex flex-col w-full h-full bg-slate-100 dark:bg-slate-900'
+      }
+    >
+      {/* Unified Clean Top Map Controls Toolbar (above map imagery, matching reference) */}
+      <div className="bg-slate-50/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800 px-2.5 py-2 sm:px-3.5 sm:py-2.5 space-y-2 shrink-0 z-20">
+        {/* Top Row: Place Search + Pick/Cancel Pin CTA */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1 sm:max-w-xs">
             <PlaceSearchBox
               onSelectLocation={(loc) => {
                 setSearchPin(loc);
@@ -542,64 +582,130 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
             />
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() =>
-                setMapTypeId((prev) =>
-                  prev === 'roadmap' ? 'hybrid' : 'roadmap'
-                )
-              }
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors whitespace-nowrap shrink-0"
-            >
-              <Layers className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-              {mapTypeId === 'roadmap' ? 'ดาวเทียม' : 'แผนที่ถนน'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLocateMe}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors whitespace-nowrap shrink-0"
-            >
-              <LocateFixed className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-              พิกัดฉัน
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onSelectLeak(null);
-                setLocalFitSeq((n) => n + 1);
-              }}
-              disabled={pinnedLeaks.length === 0}
-              title="ปรับมุมมองแผนที่ให้เห็นจุดรั่วทั้งหมดในรายการ"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 shadow-sm transition-colors whitespace-nowrap shrink-0"
-            >
-              <Scan className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              ดูทั้งหมด
-            </button>
-
+          <div className="flex items-center gap-1.5 shrink-0">
             {!isPickingLocation ? (
               <button
                 type="button"
                 onClick={onStartPickNew}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-sky-600 text-white text-xs font-medium hover:bg-sky-700 shadow-sm transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap"
               >
-                <Crosshair className="w-3.5 h-3.5" />
-                ปักหมุดจุดรั่ว
+                <Crosshair className="w-3.5 h-3.5 shrink-0" />
+                <span>ปักหมุดจุดรั่ว</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={onCancelPick}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap"
               >
-                <X className="w-3.5 h-3.5" />
-                ยกเลิก
+                <X className="w-3.5 h-3.5 shrink-0" />
+                <span>ยกเลิก</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Second Row: Map Layer Switcher + ตำแหน่งฉัน + ดูทั้งหมด + ขยายแผนที่ + Street View */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* Segmented Map-Type Pill */}
+          <div
+            role="group"
+            aria-label="รูปแบบแผนที่"
+            className="inline-flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-0.5 sm:p-1 shadow-xs max-w-full overflow-x-auto"
+          >
+            <span className="hidden sm:inline-flex items-center pl-2 pr-1 text-slate-400 dark:text-slate-500">
+              <Layers className="w-3.5 h-3.5" />
+            </span>
+            {MAP_TYPE_OPTIONS.map((opt) => {
+              const active = mapTypeId === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setMapTypeId(opt.id)}
+                  aria-pressed={active}
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    active
+                      ? 'bg-[#1565C0] dark:bg-sky-600 text-white font-semibold shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70 font-medium'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ตำแหน่งฉัน */}
+          <button
+            type="button"
+            onClick={handleLocateMe}
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <LocateFixed className="w-3.5 h-3.5 text-[#1565C0] dark:text-sky-400 shrink-0" />
+            <span>ตำแหน่งฉัน</span>
+          </button>
+
+          {/* ดูทั้งหมด */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectLeak(null);
+              setLocalFitSeq((n) => n + 1);
+            }}
+            disabled={pinnedLeaks.length === 0}
+            title="ปรับมุมมองแผนที่ให้เห็นจุดรั่วทั้งหมดในรายการ"
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Scan className="w-3.5 h-3.5 text-[#1565C0] dark:text-sky-400 shrink-0" />
+            <span>ดูทั้งหมด</span>
+          </button>
+
+          {/* ขยายแผนที่ / ย่อแผนที่ */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            aria-pressed={isExpanded}
+            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border text-[11px] sm:text-xs font-medium shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              isExpanded
+                ? 'bg-[#1565C0] dark:bg-sky-600 border-[#1565C0] dark:border-sky-600 text-white'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            {isExpanded ? (
+              <Minimize2 className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Maximize2 className="w-3.5 h-3.5 text-[#1565C0] dark:text-sky-400 shrink-0" />
+            )}
+            <span>{isExpanded ? 'ย่อแผนที่' : 'ขยายแผนที่'}</span>
+          </button>
+
+          {/* Street View */}
+          <button
+            type="button"
+            onClick={() => setStreetViewSeq((n) => n + 1)}
+            aria-pressed={streetViewActive}
+            disabled={!isApiLoaded}
+            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border text-[11px] sm:text-xs font-medium shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50 ${
+              streetViewActive
+                ? 'bg-[#1565C0] dark:bg-sky-600 border-[#1565C0] dark:border-sky-600 text-white'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Compass
+              className={`w-3.5 h-3.5 shrink-0 ${
+                streetViewActive
+                  ? 'text-white'
+                  : 'text-[#1565C0] dark:text-sky-400'
+              }`}
+            />
+            <span>Street View</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Map Canvas Container */}
+      <div className="relative flex-1 min-h-[300px] sm:min-h-[340px] w-full bg-slate-100 dark:bg-slate-950">
 
         {/* Pin-Pick Mode Banner */}
         {isPickingLocation && (
@@ -748,9 +854,9 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
             </div>
           )}
 
-        {/* GPS Feedback Toast */}
+        {/* GPS / Street View Feedback Toast */}
         {gpsStatus && (
-          <div className="absolute top-3 sm:top-16 right-3 z-20 px-3 py-1.5 rounded-md bg-slate-900/90 text-white text-xs shadow-md">
+          <div className="absolute top-3 right-3 z-20 max-w-[calc(100%-24px)] px-3 py-1.5 rounded-lg bg-slate-900/90 text-white text-xs shadow-md">
             {gpsStatus}
           </div>
         )}
@@ -822,6 +928,12 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
                 isMobile={isMobile}
                 focusTarget={focusTarget}
                 fitBoundsSeq={fitBoundsSeq + localFitSeq}
+              />
+              <StreetViewController
+                toggleSeq={streetViewSeq}
+                targetLeak={selectedLeak}
+                onStreetViewChange={setStreetViewActive}
+                onStatusMessage={showTempStatus}
               />
 
             {pinnedLeaks.map((leak) => (

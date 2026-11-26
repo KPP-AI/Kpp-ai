@@ -1335,7 +1335,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="w-full h-[430px] sm:h-[500px] lg:h-[540px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+                <div className="w-full h-[480px] sm:h-[560px] lg:h-[600px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
                   <LeakMapWorkspace
                     leaks={filteredLeaks}
                     selectedId={selectedId}
