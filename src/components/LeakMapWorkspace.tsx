@@ -20,8 +20,6 @@ import {
   LocateFixed,
   MapPin,
   Maximize2,
-  RefreshCw,
-  Scan,
   X,
 } from 'lucide-react';
 import {
@@ -207,121 +205,16 @@ const LeakMarkerItem: React.FC<LeakMarkerItemProps> = ({
 };
 
 interface MapViewportControllerProps {
-  pinnedLeaks: LeakPoint[];
-  isMobile: boolean;
   focusTarget: {lat: number; lng: number; zoom?: number; seq: number} | null;
-  fitBoundsSeq: number;
 }
 
 const MapViewportController: React.FC<MapViewportControllerProps> = ({
-  pinnedLeaks,
-  isMobile,
   focusTarget,
-  fitBoundsSeq,
 }) => {
   const map = useMap();
-  const hasInitialFitRef = React.useRef(false);
-  const lastFocusSeqRef = React.useRef<number>(focusTarget?.seq ?? 0);
-  const lastFitSeqRef = React.useRef<number>(fitBoundsSeq);
-  const lastPinSignatureRef = React.useRef<string>('');
-
-  const fitAllVisiblePins = useCallback(
-    (pins: LeakPoint[]) => {
-      if (!map) return false;
-      const validPins = pins.filter(
-        (l): l is LeakPoint & {lat: number; lng: number} =>
-          typeof l.lat === 'number' &&
-          Number.isFinite(l.lat) &&
-          typeof l.lng === 'number' &&
-          Number.isFinite(l.lng)
-      );
-      if (validPins.length === 0) return false;
-
-      if (validPins.length === 1) {
-        map.setCenter({lat: validPins[0].lat, lng: validPins[0].lng});
-        map.setZoom(16);
-        return true;
-      }
-
-      const LatLngBounds = window.google?.maps?.LatLngBounds;
-      if (!LatLngBounds) return false;
-
-      const bounds = new LatLngBounds();
-      for (const pin of validPins) {
-        bounds.extend({lat: pin.lat, lng: pin.lng});
-      }
-
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      if (ne.equals(sw)) {
-        map.setCenter({lat: validPins[0].lat, lng: validPins[0].lng});
-        map.setZoom(16);
-        return true;
-      }
-
-      const applyFit = () => {
-        map.fitBounds(bounds, {
-          top: isMobile ? 56 : 88,
-          right: isMobile ? 40 : 60,
-          bottom: isMobile ? 48 : 64,
-          left: isMobile ? 40 : 60,
-        });
-        window.google?.maps?.event?.addListenerOnce(map, 'idle', () => {
-          const z = map.getZoom();
-          if (typeof z === 'number' && z > 16) {
-            map.setZoom(16);
-          }
-        });
-      };
-
-      const div = map.getDiv();
-      if (div && div.clientHeight > 0 && div.clientWidth > 0) {
-        applyFit();
-      } else {
-        requestAnimationFrame(applyFit);
-      }
-      return true;
-    },
-    [map, isMobile]
-  );
-
-  useEffect(() => {
-    if (!map) return;
-    const signature = pinnedLeaks
-      .map((l) => `${l.id}:${l.lat ?? ''},${l.lng ?? ''}`)
-      .join('|');
-
-    const fitRequestedExplicitly = fitBoundsSeq !== lastFitSeqRef.current;
-    if (fitRequestedExplicitly) {
-      lastFitSeqRef.current = fitBoundsSeq;
-    }
-
-    if (focusTarget && focusTarget.seq !== lastFocusSeqRef.current) {
-      return;
-    }
-
-    if (
-      fitRequestedExplicitly ||
-      (!hasInitialFitRef.current && !focusTarget && pinnedLeaks.length > 0) ||
-      (hasInitialFitRef.current &&
-        !focusTarget &&
-        lastPinSignatureRef.current === '' &&
-        pinnedLeaks.length > 0)
-    ) {
-      if (fitAllVisiblePins(pinnedLeaks)) {
-        hasInitialFitRef.current = true;
-        lastPinSignatureRef.current = signature;
-      }
-    }
-  }, [map, pinnedLeaks, focusTarget, fitBoundsSeq, fitAllVisiblePins]);
 
   useEffect(() => {
     if (!map || !focusTarget) return;
-    if (focusTarget.seq === lastFocusSeqRef.current && hasInitialFitRef.current) {
-      return;
-    }
-    lastFocusSeqRef.current = focusTarget.seq;
-    hasInitialFitRef.current = true;
     map.panTo({lat: focusTarget.lat, lng: focusTarget.lng});
     if (focusTarget.zoom) {
       map.setZoom(focusTarget.zoom);
@@ -337,11 +230,8 @@ interface LeakMapWorkspaceProps {
   isPickingLocation: boolean;
   pickingReason: 'new' | 'edit';
   focusTarget: {lat: number; lng: number; zoom?: number; seq: number} | null;
-  fitBoundsSeq?: number;
   draftPin: {lat: number; lng: number} | null;
   theme?: 'day' | 'night';
-  hasApiKey?: boolean;
-  mapsError?: string | null;
   onSelectLeak: (id: string | null) => void;
   onPickMapLocation: (lat: number, lng: number) => void;
   onStartPickNew: () => void;
@@ -360,11 +250,8 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
   isPickingLocation,
   pickingReason,
   focusTarget,
-  fitBoundsSeq = 0,
   draftPin,
   theme = 'day',
-  hasApiKey = true,
-  mapsError = null,
   onSelectLeak,
   onPickMapLocation,
   onStartPickNew,
@@ -377,7 +264,6 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
   const isApiLoaded = useApiIsLoaded();
   const apiStatus = useApiLoadingStatus();
   const [mapTypeId, setMapTypeId] = useState<'roadmap' | 'hybrid'>('roadmap');
-  const [localFitSeq, setLocalFitSeq] = useState(0);
   const [searchPin, setSearchPin] = useState<{
     lat: number;
     lng: number;
@@ -469,7 +355,7 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
           }}
         />
 
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={() =>
@@ -477,50 +363,37 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
                 prev === 'roadmap' ? 'hybrid' : 'roadmap'
               )
             }
-            className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap"
           >
             <Layers className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
             <span className="truncate">
-              {mapTypeId === 'roadmap' ? 'ดาวเทียม' : 'ถนน'}
+              {mapTypeId === 'roadmap' ? 'ดาวเทียม' : 'แผนที่ถนน'}
             </span>
           </button>
 
           <button
             type="button"
             onClick={handleLocateMe}
-            className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors whitespace-nowrap"
           >
             <LocateFixed className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
             <span className="truncate">พิกัดฉัน</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              onSelectLeak(null);
-              setLocalFitSeq((n) => n + 1);
-            }}
-            disabled={pinnedLeaks.length === 0}
-            className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 shadow-xs transition-colors whitespace-nowrap"
-          >
-            <Scan className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="truncate">ทั้งหมด</span>
           </button>
 
           {!isPickingLocation ? (
             <button
               type="button"
               onClick={onStartPickNew}
-              className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-sky-600 text-white text-[11px] font-medium hover:bg-sky-700 shadow-xs transition-colors whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-sky-600 text-white text-[11px] font-medium hover:bg-sky-700 shadow-xs transition-colors whitespace-nowrap"
             >
               <Crosshair className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">ปักหมุด</span>
+              <span className="truncate">ปักหมุดจุดรั่ว</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={onCancelPick}
-              className="inline-flex items-center justify-center gap-1 px-1.5 py-2 rounded-lg bg-slate-900 text-white text-[11px] font-medium hover:bg-slate-800 shadow-xs transition-colors whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-slate-900 text-white text-[11px] font-medium hover:bg-slate-800 shadow-xs transition-colors whitespace-nowrap"
             >
               <X className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">ยกเลิก</span>
@@ -563,20 +436,6 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
             >
               <LocateFixed className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
               พิกัดฉัน
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onSelectLeak(null);
-                setLocalFitSeq((n) => n + 1);
-              }}
-              disabled={pinnedLeaks.length === 0}
-              title="ปรับมุมมองแผนที่ให้เห็นจุดรั่วทั้งหมดในรายการ"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 shadow-sm transition-colors whitespace-nowrap shrink-0"
-            >
-              <Scan className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              ดูทั้งหมด
             </button>
 
             {!isPickingLocation ? (
@@ -756,39 +615,22 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
         )}
 
         {/* Loading / Auth Failure Fallback */}
-        {(!hasApiKey ||
-          apiStatus === APILoadingStatus.FAILED ||
+        {(apiStatus === APILoadingStatus.FAILED ||
           apiStatus === APILoadingStatus.AUTH_FAILURE) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
-            <div className="max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center space-y-3 shadow-sm">
+            <div className="max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center space-y-2 shadow-sm">
               <MapPin className="w-8 h-8 text-amber-600 mx-auto" />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                 ไม่สามารถโหลดแผนที่ Google Maps ได้
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {!hasApiKey
-                  ? 'ไม่พบ Google Maps API Key ในการตั้งค่าโปรเจกต์ กรุณาตั้งค่า Google Maps API Key แล้วลองใหม่อีกครั้ง'
-                  : 'กรุณาตรวจสอบการตั้งค่า Google Maps API Key การเชื่อมต่ออินเทอร์เน็ต หรือโควต้าการใช้งานในโปรเจกต์'}
+                กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือโควต้า Google Maps API Key
               </p>
-              {mapsError && (
-                <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 break-words">
-                  {mapsError}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>ลองโหลดแผนที่ใหม่</span>
-              </button>
             </div>
           </div>
         )}
 
-        {hasApiKey &&
-          !isApiLoaded &&
+        {!isApiLoaded &&
           apiStatus !== APILoadingStatus.FAILED &&
           apiStatus !== APILoadingStatus.AUTH_FAILURE && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
@@ -796,33 +638,25 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
             </div>
           )}
 
-        {hasApiKey && (
-          <div
-            className={`w-full h-full ${isPickingLocation ? 'cursor-crosshair' : ''}`}
+        <div
+          className={`w-full h-full ${isPickingLocation ? 'cursor-crosshair' : ''}`}
+        >
+          <GoogleMap
+            mapId="DEMO_MAP_ID"
+            defaultCenter={DEFAULT_CENTER}
+            defaultZoom={14}
+            mapTypeId={mapTypeId}
+            colorScheme={theme === 'night' ? 'DARK' : 'LIGHT'}
+            gestureHandling="greedy"
+            disableDefaultUI={false}
+            streetViewControl={!isMobile}
+            mapTypeControl={false}
+            fullscreenControl={false}
+            onClick={handleMapClick}
+            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+            style={{width: '100%', height: '100%'}}
           >
-            <GoogleMap
-              mapId="DEMO_MAP_ID"
-              defaultCenter={DEFAULT_CENTER}
-              defaultZoom={14}
-              mapTypeId={mapTypeId}
-              colorScheme={theme === 'night' ? 'DARK' : 'LIGHT'}
-              gestureHandling="greedy"
-              reuseMaps={true}
-              disableDefaultUI={false}
-              zoomControl={true}
-              streetViewControl={!isMobile}
-              mapTypeControl={false}
-              fullscreenControl={false}
-              onClick={handleMapClick}
-              internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-              style={{width: '100%', height: '100%'}}
-            >
-              <MapViewportController
-                pinnedLeaks={pinnedLeaks}
-                isMobile={isMobile}
-                focusTarget={focusTarget}
-                fitBoundsSeq={fitBoundsSeq + localFitSeq}
-              />
+            <MapViewportController focusTarget={focusTarget} />
 
             {pinnedLeaks.map((leak) => (
               <LeakMarkerItem
@@ -866,9 +700,8 @@ export const LeakMapWorkspace: React.FC<LeakMapWorkspaceProps> = ({
                 />
               </AdvancedMarker>
             )}
-            </GoogleMap>
-          </div>
-        )}
+          </GoogleMap>
+        </div>
       </div>
     </div>
   );
